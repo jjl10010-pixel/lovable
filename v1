@@ -514,7 +514,8 @@ export const DigitalAdoptionOverlay = () => {
           <div className="fixed top-6 right-6 z-50">
             <Card className="w-80 shadow-xl">
               <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center just      }
+ify-between">
                   <div className="flex items-center space-x-2">
                     <Bot className="w-5 h-5 text-primary" />
                     <CardTitle className="text-lg">Smart Guide</CardTitle>
@@ -571,7 +572,8 @@ export const DigitalAdoptionOverlay = () => {
                       </Badge>
                       
                       <Button size="sm" onClick={handleNext} disabled={isPaused}>
-                        {currentStep === jobRequisitionSteps.length - 1 ? <>
+                        {currentStep                     }
+=== jobRequisitionSteps.length - 1 ? <>
                             <CheckCircle className="w-4 h-4 mr-1" />
                             Complete
                           </> : <>
@@ -591,8 +593,10 @@ export const DigitalAdoptionOverlay = () => {
                 <CardHeader className="text-center">
                   <div className="mx-auto w-12 h-12 bg-success/20 rounded-full flex items-center justify-center mb-2">
                     <CheckCircle className="w-6 h-6 text-success" />
-                  </div>
-                  <CardTitle className="text-success">AI Validation Complete</CardTitle>
+                                    }
+      </div>
+                  <CardTitle className="text-success">AI Validation C                }
+omplete</CardTitle>
                   <CardDescription>
                     Your requisition has been optimized based on successful similar postings
                   </CardDescription>
@@ -622,9 +626,11 @@ export const DigitalAdoptionOverlay = () => {
           {activeBubbles.map(bubble => <BubbleTipComponent key={bubble.id} bubble={bubble} onClose={() => handleBubbleClose(bubble.id)} />)}
         </>}
 
-      {/* Standalone Bubbles (when guide is not active) */}
+      {/* Standalone Bubbles (when gui          }
+de is not active) */}
       {!isActive && activeBubbles.map(bubble => <BubbleTipComponent key={bubble.id} bubble={bubble} onClose={() => handleBubbleClose(bubble.id)} />)}
     </div>;
 };
 
 
+      }
