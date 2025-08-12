@@ -1,0 +1,668 @@
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { X, ArrowRight, ArrowLeft, Play, Pause, RotateCcw, CheckCircle, Lightbulb, Zap, MessageSquare, Bot, ArrowUp, ArrowDown, ArrowLeftIcon, ArrowRightIcon } from "lucide-react";
+
+interface BubbleTip {
+  id: string;
+  content: string;
+  position?: {
+    x: number;
+    y: number;
+  };
+  arrow: "top" | "bottom" | "left" | "right";
+  target: string;
+  autoShow?: boolean;
+  delay?: number;
+}
+
+interface OverlayStep {
+  id: number;
+  title: string;
+  description: string;
+  targetSelector: string;
+  position: "top" | "bottom" | "left" | "right";
+  action?: "click" | "type" | "select" | "wait";
+  validation?: string;
+  aiTip?: string;
+  bubbleTip?: BubbleTip;
+}
+
+const jobRequisitionSteps: OverlayStep[] = [{
+  id: 1,
+  title: "Navigate to Recruitment",
+  description: "Click on the 'Process' menu to access recruitment features",
+  targetSelector: ".process-menu",
+  position: "bottom",
+  bubbleTip: {
+    id: "process-bubble",
+    content: "Bubbles, like this one, show you the way to access recruitment features",
+    arrow: "top",
+    target: ".process-menu",
+    autoShow: true,
+    delay: 1000
+  }
+}, {
+  id: 2,
+  title: "Start New Requisition",
+  description: "Click the '+' button or 'New Requisition' to begin creating your job posting",
+  targetSelector: ".new-requisition-btn",
+  position: "left",
+  bubbleTip: {
+    id: "new-req-bubble",
+    content: "This button creates a new job requisition. Click here to start the process!",
+    arrow: "left",
+    target: ".new-requisition-btn"
+  }
+}, {
+  id: 3,
+  title: "Enter Job Title",
+  description: "Type the job title. AI suggests: 'Senior Software Engineer' based on your team's growth pattern",
+  targetSelector: "#job-title-input",
+  position: "bottom",
+  bubbleTip: {
+    id: "job-title-bubble",
+    content: "Enter a clear, searchable job title here. AI will suggest improvements!",
+    arrow: "bottom",
+    target: "#job-title-input"
+  }
+}, {
+  id: 4,
+  title: "Select Department",
+  description: "Choose your department from the dropdown. Pre-populated based on your permissions",
+  targetSelector: "#department-select",
+  position: "right",
+  bubbleTip: {
+    id: "dept-bubble",
+    content: "Select the department to ensure proper budget allocation and approval routing",
+    arrow: "right",
+    target: "#department-select"
+  }
+}, {
+  id: 5,
+  title: "Set Hiring Manager",
+  description: "Confirm or change the hiring manager. Default set to your profile",
+  targetSelector: "#hiring-manager-field",
+  position: "top",
+  bubbleTip: {
+    id: "manager-bubble",
+    content: "The hiring manager will conduct interviews and make final decisions",
+    arrow: "top",
+    target: "#hiring-manager-field"
+  }
+}, {
+  id: 6,
+  title: "AI Validation Check",
+  description: "Our AI is comparing this requisition to 12 similar successful postings from your organization",
+  targetSelector: ".validation-panel",
+  position: "left",
+  bubbleTip: {
+    id: "validation-bubble",
+    content: "AI validation ensures your job posting follows best practices and market standards",
+    arrow: "left",
+    target: ".validation-panel"
+  }
+}, {
+  id: 7,
+  title: "Submit for Approval",
+  description: "Click submit to send for approval. Estimated approval time: 2-3 business days",
+  targetSelector: "#submit-btn",
+  position: "top",
+  action: "click",
+  bubbleTip: {
+    id: "submit-bubble",
+    content: "Ready to submit? Your requisition will be sent for approval and then posted!",
+    arrow: "bottom",
+    target: "#submit-btn"
+  }
+}];
+
+// Hook to calculate bubble position relative to target element
+const useBubblePosition = (bubble: BubbleTip) => {
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const calculatePosition = () => {
+      const targetElement = document.querySelector(bubble.target);
+      if (!targetElement) return;
+
+      const rect = targetElement.getBoundingClientRect();
+      const scrollX = window.scrollX;
+      const scrollY = window.scrollY;
+      
+      let x = 0;
+      let y = 0;
+      
+      switch (bubble.arrow) {
+        case "top":
+          x = rect.left + rect.width / 2 + scrollX;
+          y = rect.top + scrollY - 20; // 20px above the element
+          break;
+        case "bottom":
+          x = rect.left + rect.width / 2 + scrollX;
+          y = rect.bottom + scrollY + 20; // 20px below the element
+          break;
+        case "left":
+          x = rect.left + scrollX - 20; // 20px to the left
+          y = rect.top + rect.height / 2 + scrollY;
+          break;
+        case "right":
+          x = rect.right + scrollX + 20; // 20px to the right
+          y = rect.top + rect.height / 2 + scrollY;
+          break;
+        default:
+          x = rect.left + rect.width / 2 + scrollX;
+          y = rect.bottom + scrollY + 20;
+      }
+      
+      setPosition({ x, y });
+    };
+
+    // Calculate position immediately
+    calculatePosition();
+    
+    // Recalculate on window resize or scroll
+    const handleResize = () => calculatePosition();
+    const handleScroll = () => calculatePosition();
+    
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleScroll);
+    
+    // Use MutationObserver to detect DOM changes
+    const observer = new MutationObserver(calculatePosition);
+    observer.observe(document.body, { 
+      childList: true, 
+      subtree: true, 
+      attributes: true 
+    });
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleScroll);
+      observer.disconnect();
+    };
+  }, [bubble.target, bubble.arrow]);
+
+  return bubble.position || position;
+};
+
+// Interactive bubble tips that appear contextually
+const contextualBubbles: BubbleTip[] = [{
+  id: "welcome-bubble",
+  content: "Welcome! This guided tour will help you create job requisitions efficiently",
+  arrow: "bottom",
+  target: ".recruitment-header",
+  autoShow: true,
+  delay: 500
+}, {
+  id: "help-bubble",
+  content: "Need help? Click here for instant AI assistance at any time",
+  arrow: "right",
+  target: ".ai-help-btn",
+  autoShow: false
+}];
+
+const BubbleTipComponent = ({
+  bubble,
+  onClose
+}: {
+  bubble: BubbleTip;
+  onClose: () => void;
+}) => {
+  const position = useBubblePosition(bubble);
+
+  const getArrowPosition = () => {
+    switch (bubble.arrow) {
+      case "top":
+        return "bottom-[-8px] left-1/2 transform -translate-x-1/2 rotate-180";
+      case "bottom":
+        return "top-[-8px] left-1/2 transform -translate-x-1/2";
+      case "left":
+        return "right-[-8px] top-1/2 transform -translate-y-1/2 rotate-90";
+      case "right":
+        return "left-[-8px] top-1/2 transform -translate-y-1/2 -rotate-90";
+      default:
+        return "top-[-8px] left-1/2 transform -translate-x-1/2";
+    }
+  };
+
+  return (
+    <div 
+      className="fixed z-[60] animate-bubble-bounce" 
+      style={{
+        left: position.x,
+        top: position.y,
+        transform: "translate(-50%, -50%)"
+      }}
+    >
+      <div className="relative">
+        {/* Bubble */}
+        <div className="bg-red-100 border border-red-200 text-red-800 rounded-lg px-4 py-3 shadow-xl max-w-xs relative">
+          <div className="flex items-start justify-between space-x-2">
+            <p className="text-sm leading-relaxed">{bubble.content}</p>
+            <button 
+              onClick={onClose} 
+              className="text-red-600 hover:text-red-800 flex-shrink-0 ml-2"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          
+          {/* Arrow */}
+          <div className={`absolute ${getArrowPosition()}`}>
+            <div className="w-0 h-0 border-l-[8px] border-r-[8px] border-t-[8px] border-l-transparent border-r-transparent border-t-red-100" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const DigitalAdoptionOverlay = () => {
+  const [isActive, setIsActive] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [showAiInsights, setShowAiInsights] = useState(true);
+  const [activeBubbles, setActiveBubbles] = useState<BubbleTip[]>([]);
+  const [dismissedBubbles, setDismissedBubbles] = useState<string[]>([]);
+
+  const currentStepData = jobRequisitionSteps[currentStep];
+  const progress = (currentStep + 1) / jobRequisitionSteps.length * 100;
+
+  // Auto-show contextual bubbles
+  useEffect(() => {
+    if (isActive) {
+      const timer = setTimeout(() => {
+        const welcomeBubble = contextualBubbles.find(b => b.id === "welcome-bubble");
+        if (welcomeBubble && !dismissedBubbles.includes(welcomeBubble.id)) {
+          setActiveBubbles([welcomeBubble]);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isActive, dismissedBubbles]);
+
+  // Show step-specific bubbles
+  useEffect(() => {
+    if (isActive && currentStepData?.bubbleTip) {
+      const bubble = currentStepData.bubbleTip;
+      if (!dismissedBubbles.includes(bubble.id)) {
+        const timer = setTimeout(() => {
+          setActiveBubbles(prev => {
+            const filtered = prev.filter(b => b.id !== bubble.id);
+            return [...filtered, bubble];
+          });
+        }, bubble.delay || 800);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [currentStep, isActive, currentStepData, dismissedBubbles]);
+
+  const handleNext = () => {
+    if (currentStep < jobRequisitionSteps.length - 1) {
+      setCompletedSteps([...completedSteps, currentStep]);
+      setCurrentStep(currentStep + 1);
+    } else {
+      // Workflow complete
+      setIsActive(false);
+      setCompletedSteps([]);
+      setCurrentStep(0);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const handleStart = () => {
+    setIsActive(true);
+    setCurrentStep(0);
+    setCompletedSteps([]);
+    setDismissedBubbles([]);
+    setActiveBubbles([]);
+  };
+
+  const handleClose = () => {
+    setIsActive(false);
+    setIsPaused(false);
+    setActiveBubbles([]);
+  };
+
+  const handleRestart = () => {
+    setCurrentStep(0);
+    setCompletedSteps([]);
+    setIsPaused(false);
+    setDismissedBubbles([]);
+    setActiveBubbles([]);
+  };
+
+  const handleBubbleClose = (bubbleId: string) => {
+    setDismissedBubbles(prev => [...prev, bubbleId]);
+    setActiveBubbles(prev => prev.filter(b => b.id !== bubbleId));
+  };
+
+  const showContextualBubble = (bubbleId: string) => {
+    const bubble = contextualBubbles.find(b => b.id === bubbleId);
+    if (bubble && !dismissedBubbles.includes(bubbleId)) {
+      setActiveBubbles(prev => {
+        const filtered = prev.filter(b => b.id !== bubbleId);
+        return [...filtered, bubble];
+      });
+    }
+  };
+
+  // Simulate existing HR interface
+  const ExistingHRInterface = () => (
+    <div className="w-full h-screen bg-background relative overflow-hidden">
+      {/* Simulated Header */}
+      <div className="bg-slate-800 text-white p-4 flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <div className="bg-white text-slate-800 px-3 py-1 rounded text-sm font-semibold">
+            YOUR LOGO HERE
+          </div>
+          <div className="w-96 bg-slate-700 rounded-full p-2 flex items-center">
+            <div className="w-4 h-4 text-slate-400">🔍</div>
+          </div>
+        </div>
+        <div className="flex items-center space-x-6 text-sm">
+          <span>What's New</span>
+          <span>Things to Do</span>
+          <span>Calendar</span>
+          <span>Bridge</span>
+          <span>Support</span>
+          <span>Marketplace</span>
+          <span>Learn</span>
+          <span>Chat</span>
+          <div className="w-8 h-8 bg-orange-400 rounded-full"></div>
+        </div>
+      </div>
+
+      {/* Simulated Navigation */}
+      <div className="bg-gray-100 border-b p-4">
+        <div className="flex space-x-8 text-sm">
+          <span className="text-blue-600 border-b-2 border-blue-600 pb-2">Home</span>
+          <span>Resources</span>
+          <span>Myself</span>
+          <span>My Team</span>
+          <span>People</span>
+          <span className="process-menu font-semibold text-blue-600">Process</span>
+          <span>Reports & Analytics</span>
+          <span>Setup</span>
+          <span>Favorites</span>
+        </div>
+      </div>
+
+      {/* Simulated Content Area */}
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="recruitment-header text-2xl font-bold text-gray-700">Recruitment</h1>
+          <div className="flex items-center space-x-2">
+            <Button className="new-requisition-btn bg-blue-600 hover:bg-blue-700">
+              + New Requisition
+            </Button>
+          </div>
+        </div>
+
+        {/* Simulated Form */}
+        <div className="bg-white border rounded-lg p-6 space-y-6">
+          <div className="border-l-4 border-blue-500 pl-4">
+            <h2 className="font-semibold">Position Information</h2>
+          </div>
+          
+          <div className="grid grid-cols-4 gap-6">
+            <div>
+              <label className="block text-sm font-medium mb-2">Requisition #</label>
+              <div className="text-gray-600">1061</div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Job Title, EEO Category or Occupation Group</label>
+              <input 
+                id="job-title-input" 
+                className="w-full border rounded px-3 py-2" 
+                placeholder="Database Analyst (DA)" 
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Worker Category</label>
+              <select className="w-full border rounded px-3 py-2">
+                <option>Full Time (F)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Number of Positions</label>
+              <div className="text-gray-600">1</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium mb-2">Job Title *</label>
+              <select id="department-select" className="w-full border rounded px-3 py-2">
+                <option>Database Analyst (DA)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Worker Category</label>
+              <select className="w-full border rounded px-3 py-2">
+                <option>Full Time (F)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium mb-2">Hiring Manager</label>
+              <select id="hiring-manager-field" className="w-full border rounded px-3 py-2">
+                <option>Mark Torres - Pos ID: 1WW94929N</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Worked in country</label>
+              <select className="w-full border rounded px-3 py-2">
+                <option>United States (US)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="validation-panel bg-green-50 border border-green-200 rounded p-4">
+            <div className="flex items-center space-x-2">
+              <Bot className="w-5 h-5 text-green-600" />
+              <span className="font-medium text-green-800">AI Validation Complete</span>
+            </div>
+            <p className="text-sm text-green-700 mt-1">
+              This requisition matches 94% similarity with successful Database Analyst postings
+            </p>
+          </div>
+
+          <div className="flex justify-end">
+            <Button id="submit-btn" className="bg-blue-600 hover:bg-blue-700">
+              Submit for Approval
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="relative w-full h-screen">
+      {/* Existing HR Interface */}
+      <ExistingHRInterface />
+
+      {/* Digital Adoption Launch Button */}
+      {!isActive && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <Button 
+            onClick={handleStart} 
+            className="bg-primary hover:bg-primary/90 shadow-lg flex items-center space-x-2 px-6 py-3 rounded-full"
+          >
+            <Zap className="w-5 h-5" />
+            <span>Start Guided Tour</span>
+          </Button>
+        </div>
+      )}
+
+      {/* Overlay Controls */}
+      {isActive && (
+        <>
+          {/* Dark Overlay */}
+          <div className="fixed inset-0 bg-black/40 z-40" />
+          
+          {/* Control Panel */}
+          <div className="fixed top-6 right-6 z-50">
+            <Card className="w-80 shadow-xl">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Bot className="w-5 h-5 text-primary" />
+                    <CardTitle className="text-lg">Smart Guide</CardTitle>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setIsPaused(!isPaused)}
+                    >
+                      {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={handleRestart}>
+                      <RotateCcw className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={handleClose}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+                <Progress value={progress} className="mt-2" />
+                <CardDescription>
+                  Step {currentStep + 1} of {jobRequisitionSteps.length}
+                </CardDescription>
+              </CardHeader>
+              
+              <CardContent className="space-y-4">
+                {currentStepData && (
+                  <>
+                    <div>
+                      <h3 className="font-semibold text-foreground mb-2">
+                        {currentStepData.title}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {currentStepData.description}
+                      </p>
+                    </div>
+
+                    {currentStepData.aiTip && showAiInsights && (
+                      <div className="bg-gradient-to-r from-accent/10 to-primary/10 border border-accent/20 rounded-lg p-3">
+                        <div className="flex items-start space-x-2">
+                          <Lightbulb className="w-4 h-4 text-accent mt-0.5" />
+                          <div>
+                            <p className="text-xs font-medium text-accent">AI Insight</p>
+                            <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line">
+                              {currentStepData.aiTip}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handlePrevious} 
+                        disabled={currentStep === 0}
+                      >
+                        <ArrowLeft className="w-4 h-4 mr-1" />
+                        Previous
+                      </Button>
+                      
+                      <Badge variant="outline">
+                        {currentStep + 1}/{jobRequisitionSteps.length}
+                      </Badge>
+                      
+                      <Button size="sm" onClick={handleNext} disabled={isPaused}>
+                        {currentStep === jobRequisitionSteps.length - 1 ? (
+                          <>
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            Complete
+                          </>
+                        ) : (
+                          <>
+                            Next
+                            <ArrowRight className="w-4 h-4 ml-1" />
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* AI Validation Success Modal */}
+          {currentStep === 5 && (
+            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+              <Card className="w-96 shadow-2xl border-success">
+                <CardHeader className="text-center">
+                  <div className="mx-auto w-12 h-12 bg-success/20 rounded-full flex items-center justify-center mb-2">
+                    <CheckCircle className="w-6 h-6 text-success" />
+                  </div>
+                  <CardTitle className="text-success">AI Validation Complete</CardTitle>
+                  <CardDescription>
+                    Your requisition has been optimized based on successful similar postings
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="bg-success/10 p-3 rounded-lg">
+                    <p className="text-sm font-medium">✅ Salary range: Market competitive</p>
+                    <p className="text-sm font-medium">✅ Job description: 92% match with top performers</p>
+                    <p className="text-sm font-medium">⚠️ Location: Consider adding "Remote" option</p>
+                  </div>
+                  <Badge className="w-full justify-center bg-success hover:bg-success">
+                    Verification Badge Earned
+                  </Badge>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Smart Assistance Chat */}
+          <div className="fixed bottom-6 left-6 z-50">
+            <Button 
+              variant="outline" 
+              className="ai-help-btn bg-background shadow-lg flex items-center space-x-2" 
+              onMouseEnter={() => showContextualBubble("help-bubble")}
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>Ask AI Assistant</span>
+            </Button>
+          </div>
+
+          {/* Active Bubble Tips */}
+          {activeBubbles.map(bubble => (
+            <BubbleTipComponent 
+              key={bubble.id} 
+              bubble={bubble} 
+              onClose={() => handleBubbleClose(bubble.id)} 
+            />
+          ))}
+        </>
+      )}
+
+      {/* Standalone Bubbles (when guide is not active) */}
+      {!isActive && activeBubbles.map(bubble => (
+        <BubbleTipComponent 
+          key={bubble.id} 
+          bubble={bubble} 
+          onClose={() => handleBubbleClose(bubble.id)} 
+        />
+      ))}
+    </div>
+  );
+};
