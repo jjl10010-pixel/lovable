@@ -7,17 +7,13 @@ import { X, ArrowRight, ArrowLeft, Play, Pause, RotateCcw, CheckCircle, Lightbul
 interface BubbleTip {
   id: string;
   content: string;
-  position: {
+  position?: {
     x: number;
     y: number;
   };
   arrow: "top" | "bottom" | "left" | "right";
   target: string;
   autoShow?: boolean;
-  delay?: number;
-}
-interface OverlayStep {
-  id: number;
   title: string;
   description: string;
   targetSelector: string;
@@ -33,10 +29,6 @@ const jobRequisitionSteps: OverlayStep[] = [{
   description: "Click on the 'Process' menu to access recruitment features",
   targetSelector: ".process-menu",
   position: "bottom",
-  action: "click",
-  aiTip: "AI detected you haven't created a job requisition in 30 days. Let's walk through the updated process.",
-  bubbleTip: {
-    id: "process-bubble",
     content: "Bubbles, like this one, show you the way to access recruitment features",
     position: {
       x: 360,
@@ -52,10 +44,6 @@ const jobRequisitionSteps: OverlayStep[] = [{
   title: "Start New Requisition",
   description: "Click the '+' button or 'New Requisition' to begin creating your job posting",
   targetSelector: ".new-requisition-btn",
-  position: "left",
-  action: "click",
-  bubbleTip: {
-    id: "new-req-bubble",
     content: "This button creates a new job requisition. Click here to start the process!",
     position: {
       x: 700,
@@ -69,10 +57,6 @@ const jobRequisitionSteps: OverlayStep[] = [{
   title: "Enter Job Title",
   description: "Type the job title. AI suggests: 'Senior Software Engineer' based on your team's growth pattern",
   targetSelector: "#job-title-input",
-  position: "top",
-  action: "type",
-  validation: "job-title-required",
-  aiTip: "Similar roles in Engineering averaged 45 days to fill. Consider competitive compensation.",
   bubbleTip: {
     id: "job-title-bubble",
     content: "Enter a clear, searchable job title here. AI will suggest improvements!",
@@ -87,10 +71,6 @@ const jobRequisitionSteps: OverlayStep[] = [{
   id: 4,
   title: "Select Department",
   description: "Choose your department from the dropdown. Pre-populated based on your permissions",
-  targetSelector: "#department-select",
-  position: "right",
-  action: "select",
-  bubbleTip: {
     id: "dept-bubble",
     content: "Select the department to ensure proper budget allocation and approval routing",
     position: {
@@ -105,10 +85,6 @@ const jobRequisitionSteps: OverlayStep[] = [{
   title: "Set Hiring Manager",
   description: "Confirm or change the hiring manager. Default set to your profile",
   targetSelector: "#hiring-manager-field",
-  position: "bottom",
-  action: "click",
-  aiTip: "Mark Torres has 85% successful hire rate. Consider keeping as hiring manager.",
-  bubbleTip: {
     id: "manager-bubble",
     content: "The hiring manager will conduct interviews and make final decisions",
     position: {
@@ -122,10 +98,6 @@ const jobRequisitionSteps: OverlayStep[] = [{
   id: 6,
   title: "AI Validation Check",
   description: "Our AI is comparing this requisition to 12 similar successful postings from your organization",
-  targetSelector: ".validation-panel",
-  position: "left",
-  action: "wait",
-  aiTip: "✅ Salary range aligns with market data\n⚠️ Consider adding 'Remote' to location for 40% more applicants",
   bubbleTip: {
     id: "validation-bubble",
     content: "AI validation ensures your job posting follows best practices and market standards",
@@ -135,10 +107,6 @@ const jobRequisitionSteps: OverlayStep[] = [{
     },
     arrow: "left",
     target: ".validation-panel"
-  }
-}, {
-  id: 7,
-  title: "Submit for Approval",
   description: "Click submit to send for approval. Estimated approval time: 2-3 business days",
   targetSelector: "#submit-btn",
   position: "top",
@@ -146,15 +114,79 @@ const jobRequisitionSteps: OverlayStep[] = [{
   bubbleTip: {
     id: "submit-bubble",
     content: "Ready to submit? Your requisition will be sent for approval and then posted!",
-    position: {
-      x: 650,
-      y: 710
-    },
     arrow: "bottom",
     target: "#submit-btn"
   }
 }];
 
+// Hook to calculate bubble position relative to target element
+const useBubblePosition = (bubble: BubbleTip) => {
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const calculatePosition = () => {
+      const targetElement = document.querySelector(bubble.target);
+      if (!targetElement) return;
+
+      const rect = targetElement.getBoundingClientRect();
+      const scrollX = window.scrollX;
+      const scrollY = window.scrollY;
+      
+      let x = 0;
+      let y = 0;
+      
+      switch (bubble.arrow) {
+        case "top":
+          x = rect.left + rect.width / 2 + scrollX;
+          y = rect.top + scrollY - 20; // 20px above the element
+          break;
+        case "bottom":
+          x = rect.left + rect.width / 2 + scrollX;
+          y = rect.bottom + scrollY + 20; // 20px below the element
+          break;
+        case "left":
+          x = rect.left + scrollX - 20; // 20px to the left
+          y = rect.top + rect.height / 2 + scrollY;
+          break;
+        case "right":
+          x = rect.right + scrollX + 20; // 20px to the right
+          y = rect.top + rect.height / 2 + scrollY;
+          break;
+        default:
+          x = rect.left + rect.width / 2 + scrollX;
+          y = rect.bottom + scrollY + 20;
+      }
+      
+      setPosition({ x, y });
+    };
+
+    // Calculate position immediately
+    calculatePosition();
+    
+    // Recalculate on window resize or scroll
+    const handleResize = () => calculatePosition();
+    const handleScroll = () => calculatePosition();
+    
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleScroll);
+    
+    // Use MutationObserver to detect DOM changes
+    const observer = new MutationObserver(calculatePosition);
+    observer.observe(document.body, { 
+      childList: true, 
+      subtree: true, 
+      attributes: true 
+    });
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleScroll);
+      observer.disconnect();
+    };
+  }, [bubble.target, bubble.arrow]);
+
+  return bubble.position || position;
+};
 // Interactive bubble tips that appear contextually
 const contextualBubbles: BubbleTip[] = [{
   id: "welcome-bubble",
@@ -185,6 +217,8 @@ const BubbleTipComponent = ({
   bubble: BubbleTip;
   onClose: () => void;
 }) => {
+  const position = useBubblePosition(bubble);
+
   const getArrowIcon = () => {
     switch (bubble.arrow) {
       case "top":
@@ -214,8 +248,8 @@ const BubbleTipComponent = ({
     }
   };
   return <div className="fixed z-[60] animate-bubble-bounce" style={{
-    left: bubble.position.x,
-    top: bubble.position.y,
+    left: position.x,
+    top: position.y,
     transform: "translate(-50%, -50%)"
   }}>
       <div className="relative">
@@ -367,7 +401,7 @@ export const DigitalAdoptionOverlay = () => {
       {/* Simulated Content Area */}
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-700">Recruitment</h1>
+          <h1 className="recruitment-header text-2xl font-bold text-gray-700">Recruitment</h1>
           <div className="flex items-center space-x-2">
             <Button className="new-requisition-btn bg-blue-600 hover:bg-blue-700">
               + New Requisition
